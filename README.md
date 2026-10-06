@@ -515,27 +515,6 @@ points to where the evidence sits in this report.
 | Containment, eradication and recovery | Planned domain blocking, removal of the RAT and its persistence, credential rotation from a clean device, and a full Windows rebuild.            |
 | Post-incident activity                | Lessons learned, indicator sharing with the community, and this report.                                                                          |
 
-### 12.2 Skills to develop next
-
-The investigation also showed where further practice would add value:
-
-- **Forensic acquisition:** capturing disk and memory images (for
-  example with FTK Imager or KAPE) instead of photographs, to preserve
-  evidence in a defensible form.
-
-- **Logging and detection engineering:** deploying Sysmon and PowerShell
-  script block logging, forwarding them to Splunk, and writing
-  detections for silent msiexec installs from AppData.
-
-- **Dynamic malware analysis:** detonating samples in an isolated
-  sandbox to observe command and control behaviour directly.
-
-- **Persistence hunting:** systematic review of autostart locations with
-  tools such as Autoruns.
-
-- **Memory forensics:** using Volatility to examine running malware and
-  recover artefacts that never touch the disk.
-
 ## Appendix A. Command log in order of execution
 
 All commands were run in Windows PowerShell on the affected host. Steps
