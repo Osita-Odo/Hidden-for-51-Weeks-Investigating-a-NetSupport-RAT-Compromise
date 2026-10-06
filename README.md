@@ -86,7 +86,8 @@ The incident was detected through a Windows error dialog that kept
 appearing on screen. It stated that service.exe could not run because
 PCICL32.dll was missing.
 
-<p align="center"><img src="screenshots/01-error-dialog.png" alt="Error dialog that triggered the investigation" width="800"></p>
+<img width="875" height="358" alt="image" src="https://github.com/user-attachments/assets/9f4279de-4e36-457d-9c3d-23161580d935" />
+
 
 *Figure 1: Error dialog that triggered the investigation*
 
@@ -106,34 +107,19 @@ The Task Manager Details view showed two processes of interest:
 | service.exe     | 22572   | \<user\>   | 32-bit process, consistent with the NetSupport client (client32.exe) renamed. Running from the staging folder. |
 | servicehost.exe | 6076    | SYSTEM   | Not a standard Windows name, so initially treated as suspicious. Later resolved as legitimate (section 4.7).   |
 
-<p align="center"><img src="screenshots/02-task-manager-processes.png" alt="task manager processes" width="800"></p>
+<img width="940" height="632" alt="image" src="https://github.com/user-attachments/assets/514c59ea-56b1-491d-a7e0-c9bec7e629c0" />
 
-*Figure 2: Task Manager
-Details view showing service.exe (PID 22572) and servicehost.exe (PID
+*Figure 2: Task Manager Details view showing service.exe (PID 22572) and servicehost.exe (PID
 6076)*
 
-<p align="center"><img src="screenshots/03-pid-query-not-elevated.png" alt="Non-elevated query for PID 6076 returning no path or command line" width="800"></p>
+<img width="946" height="489" alt="image" src="https://github.com/user-attachments/assets/46a65a05-7e8e-412b-a22a-be1d00db6e8f" />
 
 *Figure 3: Non-elevated query for PID 6076 returning no path or command
 line*
 
 #### Commands used at this stage
 
-**Action:** Task Manager \> Details tab (sorted by name)
-
-- **Purpose:** List all running processes with user, architecture and PID to spot anything unfamiliar.
-- **Outcome:** Found service.exe (PID 22572, user `<user>`, 32-bit) and servicehost.exe (PID 6076, SYSTEM).
-
-**Action:** Task Manager \> right-click service.exe \> Open file location
-
-- **Purpose:** Find where the suspicious executable lives on disk.
-- **Outcome:** Opened %APPDATA%\Svservices, the RAT staging folder.
-
-```powershell
-Get-CimInstance Win32_Process -Filter "ProcessId=6076" | select ExecutablePath,CommandLine
-```
-- **Purpose:** Get the path and command line of servicehost.exe.
-- **Outcome:** Empty result. The window was not elevated, and standard users cannot read details of SYSTEM processes. Repeated later as administrator (section 4.7).
+<img width="921" height="458" alt="image" src="https://github.com/user-attachments/assets/0b0b6577-7f6c-4425-91e9-38e3d9ea91eb" />
 
 
 ### 4.2 Staging folder
@@ -142,80 +128,40 @@ The launcher was located in `C:\Users\<user>\AppData\Roaming\Svservices`.
 The folder name imitates "services" with a misspelling, a common
 disguise. Its contents form a complete NetSupport client kit:
 
-| **File**                                                                           | **Date modified** | **Size**  | **Role**                                                   |
-|------------------------------------------------------------------------------------|-------------------|-----------|------------------------------------------------------------|
-| service.exe                                                                        | 23/04/2025 23:05  | 116 KB    | Renamed NetSupport client (client32.exe)                   |
-| client32.ini                                                                       | 08/08/2025 07:27  | 1 KB      | Client configuration including attacker gateways           |
-| fe0 (fe0.msi)                                                                      | 02/09/2025 16:27  | 3,862 KB  | Windows Installer package that deployed the kit            |
-| NSM.LIC                                                                            | 13/07/2012 19:26  | 1 KB      | Old cracked NetSupport licence reused across RAT campaigns |
-| HTCTL32.DLL, TCCTL32.DLL, pcicapi.dll, PCICHEK.DLL, AudioCapture.dll, msvcr100.dll | 13/07/2025 18:09  | Various   | NetSupport support libraries                               |
-| remcmdstub.exe                                                                     | 13/07/2025 18:09  | 59 KB     | NetSupport remote command component                        |
-| NSM.ini, nsm_vpro.ini, nskbfltr.inf                                                | 13/07/2025 18:09  | 1 to 6 KB | NetSupport settings                                        |
-| PCICL32.DLL                                                                        | n/a               | n/a       | Missing: quarantined by Defender on 26/08/2026             |
+<img width="762" height="541" alt="image" src="https://github.com/user-attachments/assets/1b6f373d-3ca1-4c56-813e-a586f2ccd40e" />
 
-<p align="center"><img src="screenshots/04-svservices-folder.png" alt="svservices folder" width="800"></p>
-
+<img width="936" height="719" alt="image" src="https://github.com/user-attachments/assets/57bf6367-98ad-4b7f-b8aa-fff1409915ce" />
 *Figure 4: Contents of %APPDATA%\Svservices in File Explorer*
 
-<p align="center"><img src="screenshots/05-folder-creation-time.png" alt="Earliest Defender events and the creation time of the Svservices folder (2 September 2025, 16:16:45)" width="800"></p>
 
+<img width="932" height="367" alt="image" src="https://github.com/user-attachments/assets/109fdfa5-f9d6-4680-bbdd-dc67ecc2b46a" />
 *Figure 5: Earliest Defender events and the creation time of the
 Svservices folder (showing 2 September 2025, 16:16:45)*
 
 #### Commands used at this stage
 
-**Action:** File Explorer: `C:\Users\<user>\AppData\Roaming\Svservices`
-
-- **Purpose:** Inventory the files in the staging folder.
-- **Outcome:** 14 files consistent with a NetSupport client kit; PCICL32.DLL missing.
-
-```powershell
-(Get-Item "$env:APPDATA\Svservices").CreationTime
-```
-- **Purpose:** Find when the folder was actually created, since file timestamps can be inherited from the attacker.
-- **Outcome:** Tuesday 2 September 2025, 16:16:45. This became the infection anchor time.
-
+<img width="770" height="271" alt="image" src="https://github.com/user-attachments/assets/bd4e69a7-afb4-4dd3-b499-85e233805a2c" />
 
 ### 4.3 Configuration analysis (client32.ini)
 
 The configuration file was read as plain text without running anything.
 It shows a client set up for covert, attacker-controlled use:
 
-| **Setting**                                         | **Value**                             | **Meaning**                                                            |
-|-----------------------------------------------------|---------------------------------------|------------------------------------------------------------------------|
-| GatewayAddress                                      | sonosarcx[.]com:2080                    | Primary attacker command server                                        |
-| SecondaryGateway                                    | sonosarcl[.]net:2080                    | Backup command server                                                  |
-| Port / SecondaryPort                                | 2080                                  | Non-standard port for the HTTP gateway traffic                         |
-| SysTray                                             | 0                                     | Hides the NetSupport tray icon from the user                           |
-| quiet                                               | 1                                     | Suppresses licence prompts                                             |
-| Usernames                                           | \*                                    | Works for any logged-in user                                           |
-| silent / ShowUIOnConnect                            | 1 / 0                                 | No notification or window when the attacker connects                   |
-| DisableDisconnect, DisableClientConnect             | 1                                     | User cannot end or control the remote session                          |
-| DisableChatMenu, DisableMessage, DisableRequestHelp | 1                                     | Removes user-facing NetSupport features that could reveal its presence |
-| Password, GSK, GSKX                                 | Encrypted values                      | Operator access credentials (attacker's, not the user's)               |
-| \[\_Info\] Filename                                 | C:\Program Files (x86)\NetSupport\\.. | Path from the attacker's build machine                                 |
+<img width="786" height="601" alt="image" src="https://github.com/user-attachments/assets/d9e302e4-3564-4df3-bedb-a056735f98f4" />               
 
 The domain names loosely imitate the Sonos brand. A web search at the
 time of the investigation found no public reporting on either domain.
 
-<p align="center"><img src="screenshots/06-client32-config-client.png" alt="client32.ini, [Client] section: silent operation, hidden tray icon and disabled user controls" width="800"></p>
-
+<img width="938" height="513" alt="image" src="https://github.com/user-attachments/assets/f818a575-c0f9-47d3-871b-66b912ed12f1" />
 *Figure 6: client32.ini, \[Client\] section: silent operation, hidden
 tray icon and disabled user controls*
 
-<p align="center"><img src="screenshots/07-client32-config-http.png" alt="client32.ini, [HTTP] section: gateways sonosarcx[.]com and sonosarcl[.]net on port 2080" width="800"></p>
-
+<img width="938" height="536" alt="image" src="https://github.com/user-attachments/assets/b8088721-073a-461e-a9bb-f0630cfc232c" />
 *Figure 7: client32.ini, \[HTTP\] section: gateways sonosarcx[.]com and
 sonosarcl[.]net on port 2080*
 
 #### Commands used at this stage
-
-```powershell
-Get-Content "$env:APPDATA\Svservices\client32.ini"
-```
-- **Purpose:** Read the RAT configuration as plain text, without executing anything.
-- **Outcome:** Revealed gateways sonosarcx[.]com:2080 and sonosarcl[.]net:2080, plus hidden-tray and silent settings.
-
+<img width="780" height="166" alt="image" src="https://github.com/user-attachments/assets/7c994129-9e23-41f6-9caf-8d7442cf7591" />
 
 ### 4.4 Network activity
 
@@ -227,25 +173,12 @@ available to show earlier connections.
 
 #### Commands used at this stage
 
-```powershell
-ipconfig /displaydns | Select-String sonosarc
-```
-- **Purpose:** Check whether the host recently resolved either gateway domain.
-- **Outcome:** No output: no recent lookups.
-
-```powershell
-Get-NetTCPConnection -RemotePort 2080 -ErrorAction SilentlyContinue
-```
-- **Purpose:** Check for live connections on the gateway port.
-- **Outcome:** No output: no active command and control connection.
+<img width="772" height="211" alt="image" src="https://github.com/user-attachments/assets/20c55100-4f4f-4bc2-a21f-83c3313d03cf" />
 
 
 ### 4.5 Microsoft Defender detection history
 
-| **Time (local)**    | **Event**                                                                                                                                       |
-|---------------------|-------------------------------------------------------------------------------------------------------------------------------------------------|
-| 26/08/2026 11:19:40 | Real-time protection detects HackTool:Win32/RemoteAdmin!MTB (severity High, category Tool) in Svservices\PCICL32.DLL while service.exe loads it |
-| 26/08/2026 11:20:44 | Remediation applied: PCICL32.DLL quarantined; status "No additional actions required"                                                           |
+<img width="775" height="187" alt="image" src="https://github.com/user-attachments/assets/dadd89ef-ecf9-4b90-9009-268ab9234df4" />
 
 These were the only Defender events matching the investigation keywords.
 Defender classified the file as a "Tool" rather than a trojan, because
@@ -253,36 +186,17 @@ NetSupport is commercial software. It removed only the one detected
 library and left the launcher, configuration, installer and persistence
 in place. This explains both the late detection and the recurring error.
 
-<p align="center"><img src="screenshots/08-network-checks-defender-quarantine.png" alt="DNS and port 2080 checks (no results), and the Defender quarantine event at 11:20:44" width="800"></p>
-
+<img width="938" height="495" alt="image" src="https://github.com/user-attachments/assets/f57a8056-3fea-414a-8345-d839527e68be" />
 *Figure 8: DNS and port 2080 checks (no results), and the Defender
 quarantine event at 11:20:44*
 
-<p align="center"><img src="screenshots/09-defender-detection.png" alt="Defender detection event at 11:19:40 for PCICL32.DLL loaded by service.exe" width="800"></p>
-
+<img width="938" height="495" alt="image" src="https://github.com/user-attachments/assets/f57c45ac-e47e-4052-b590-08f230da6017" />
 *Figure 9: Defender detection event at 11:19:40 for PCICL32.DLL loaded
 by service.exe*
 
 #### Commands used at this stage
 
-```powershell
-Get-WinEvent -LogName "Microsoft-Windows-Windows Defender/Operational" |
-  ? Message -match "Svservices|PCICL32|NetSupport" |
-  select TimeCreated,Message -First 20 |
-  fl
-```
-- **Purpose:** Find Defender detections related to the RAT and what action was taken.
-- **Outcome:** Two events on 26/08/2026: detection of HackTool:Win32/RemoteAdmin!MTB in PCICL32.DLL, then quarantine.
-
-```powershell
-Get-WinEvent -LogName "Microsoft-Windows-Windows Defender/Operational" |
-  ? Message -match "Svservices|PCICL32|NetSupport|servicehost" |
-  sort TimeCreated |
-  select TimeCreated -First 3
-```
-- **Purpose:** Find the earliest related detection, and check whether Defender ever flagged servicehost.exe.
-- **Outcome:** Earliest event 26/08/2026 11:19:40. No earlier detections and no servicehost.exe events.
-
+<img width="836" height="361" alt="image" src="https://github.com/user-attachments/assets/6e1ab9bb-2475-4aa7-ae89-f4211286ba3e" />
 
 ### 4.6 File system timeline for 2 September 2025
 
@@ -290,69 +204,30 @@ The staging folder was created on **2 September 2025 at 16:16:45**. A
 recursive search of the user profile, including hidden folders, produced
 the following sequence:
 
-| **Time (local)** | **Artefact**                                                | **Interpretation**                                |
-|------------------|-------------------------------------------------------------|---------------------------------------------------|
-| 09:38:46         | Recent link to msftconnecttest.com redirect                 | Wi-Fi captive portal (on campus)                  |
-| 14:18:20         | Recent link to info.h-brs.de eduroam page                   | University Wi-Fi set-up page                      |
-| 14:18:31         | Downloads\easyroam.msix                                     | Genuine eduroam installer (verified, section 4.7) |
-| 15:31:22         | AppData\Roaming\Microsoft\Crypto\Keys\\..                   | Routine Windows key file                          |
-| 16:16:45         | AppData\Roaming\Svservices                                  | Staging folder created: infection begins          |
-| 16:16:46         | Svservices\fe0.msi                                          | Malicious installer written one second later      |
-| 16:16:52         | AppData\Local\NetSupport\NetSupport Manager                 | Installer runs and deploys NetSupport             |
-| 16:21:30         | Downloads\TradingView (1).msix                              | Genuine TradingView installer (verified)          |
-| 16:22:08         | AppData\Local\Packages\TradingView.Desktop\_...             | TradingView app installed                         |
-| 16:54:46         | Temp\\..\CRX_INSTALL                                        | A Chrome extension was installed                  |
-| 19:57:18         | Recent link to kycport.com                                  | Website visited                                   |
-| 20:02:05         | Recent link to github.com TradingView-Crypto-developer-mode | GitHub page visited                               |
-
+<img width="672" height="660" alt="image" src="https://github.com/user-attachments/assets/be819071-319f-41c3-b18d-585c06a2eded" />
+                        
 No file was created in the user profile between 15:31 and 16:16.
 Whatever started the infection therefore left no file of its own behind,
 which points to a command or script run directly rather than a
 downloaded file that was opened.
 
-<p align="center"><img src="screenshots/10-file-search-no-force.png" alt="First file search for 2 September 2025 without -Force: hidden folders skipped" width="800"></p>
-
+<img width="938" height="289" alt="image" src="https://github.com/user-attachments/assets/b4e33895-0791-4e20-9761-0fc663b7cbf3" />
 *Figure 10: First file search for 2 September 2025 without -Force:
 hidden folders skipped*
 
-<p align="center"><img src="screenshots/11-file-search-force.png" alt="Elevated file search with -Force, showing hidden AppData artefacts from 2 September 2025" width="800"></p>
-
+<img width="931" height="652" alt="image" src="https://github.com/user-attachments/assets/fda0696b-8704-45a6-abb7-e3c6abcd554f" />
 *Figure 11: Elevated file search with -Force, showing hidden AppData
 artefacts from 2 September 2025*
 
-<p align="center"><img src="screenshots/12-timeline-csv.png" alt="Timeline export (sep2_timeline.csv): Svservices, fe0.msi and NetSupport created 16:16:45 to 16:16:52, followed by the genuine TradingView install" width="800"></p>
-
+<img width="938" height="495" alt="image" src="https://github.com/user-attachments/assets/50c6fb1c-3519-40b3-b61a-f11eb849a2e0" />
 *Figure 12: Timeline export (sep2_timeline.csv): Svservices, fe0.msi and
 NetSupport created 16:16:45 to 16:16:52, followed by the genuine
 TradingView install*
 
 #### Commands used at this stage
 
-```powershell
-Get-ChildItem $env:USERPROFILE -Recurse -ErrorAction SilentlyContinue |
-  ? { $_.CreationTime.Date -eq [datetime]'2025-09-02' } |
-  select CreationTime,FullName |
-  sort CreationTime
-```
-- **Purpose:** List every file created in the user profile on the infection day.
-- **Outcome:** Three results: a personal document, easyroam.msix and TradingView (1).msix. Hidden folders such as AppData were skipped because -Force was missing.
+<img width="765" height="562" alt="image" src="https://github.com/user-attachments/assets/2bbb457e-78c5-4064-9dd6-2e68188dc562" />
 
-**Attempt:** the same search with `-Force`, limited to 15:30 to 16:30, piped to `Export-Csv "$env:USERPROFILE\Desktop\sep2_timeline.csv"`
-
-- **Purpose:** Include hidden folders and save the full result to a readable file.
-- **Outcome:** Failed: "Could not find a part of the path". The Desktop is redirected to OneDrive, and the \$\_ variable was lost when the command was retyped.
-
-```powershell
-Get-ChildItem $env:USERPROFILE -Recurse -Force -ErrorAction SilentlyContinue |
-  Where-Object CreationTime -ge ([datetime]'2025-09-02 15:30') |
-  Where-Object CreationTime -le ([datetime]'2025-09-02 16:30') |
-  Sort-Object CreationTime |
-  Select-Object CreationTime,FullName |
-  Export-Csv "$env:USERPROFILE\sep2_timeline.csv" -NoTypeInformation
-notepad "$env:USERPROFILE\sep2_timeline.csv"
-```
-- **Purpose:** Same search, rewritten without \$\_ and saved to the home folder.
-- **Outcome:** Succeeded. Showed Svservices at 16:16:45, fe0.msi at 16:16:46 and NetSupport Manager at 16:16:52, with nothing created between 15:31 and 16:16.
 
 
 ### 4.7 False leads ruled out
@@ -361,62 +236,21 @@ Several items were initially treated as suspicious and then checked.
 Recording these is important because two early hypotheses turned out to
 be wrong.
 
-| **Item**                 | **Checks performed**                                                   | **Result**                                                                                                                                                                                                                                 |
-|--------------------------|------------------------------------------------------------------------|--------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| TradingView (1).msix     | Authenticode signature; Zone.Identifier stream; installed AppX package | Genuine. Valid signature from TradingView, Inc. (Sectigo Public Code Signing CA R36, thumbprint 2480BCB9...BABE3D). Downloaded from tvd-packages.tradingview.com (ZoneId=3). Installed five minutes after the infection, so not the cause. |
-| easyroam.msix            | Authenticode signature; installed AppX package                         | Genuine. Signed by DFN-Verein, Berlin (Sectigo Public Code Signing CA E36, thumbprint 90F46B75...D68C72F).                                                                                                                                 |
-| servicehost.exe (SYSTEM) | Executable path and parent process (elevated session)                  | Legitimate. C:\Program Files\McAfee\WebAdvisor\ServiceHost.exe, started by services.exe (PID 1340). No second, SYSTEM-level foothold.                                                                                                      |
+<img width="773" height="397" alt="image" src="https://github.com/user-attachments/assets/32fe2c8c-d1f5-4abf-b9ab-e87070cf0206" />
 
-<p align="center"><img src="screenshots/13-signature-check.png" alt="Valid Authenticode signatures for the TradingView and easyroam installers" width="800"></p>
 
+<img width="938" height="805" alt="image" src="https://github.com/user-attachments/assets/f15a14a1-6f8c-48db-adfe-2c9dc98294e7" />
 *Figure 13: Valid Authenticode signatures for the TradingView and
 easyroam installers*
 
 #### Commands used at this stage
 
-```powershell
-cd $env:USERPROFILE\Downloads; Get-AuthenticodeSignature "TradingView (1).msix","easyroam.msix" |
-  fl Path,Status,SignerCertificate
-```
-- **Purpose:** Verify who signed the two installers downloaded that day.
-- **Outcome:** Both Valid: TradingView, Inc. and DFN-Verein respectively.
-
-```powershell
-Get-Content "TradingView (1).msix" -Stream Zone.Identifier
-```
-- **Purpose:** Read the Mark of the Web to see where the file was downloaded from.
-- **Outcome:** HostUrl was tvd-packages.tradingview.com: the official TradingView server.
-
-```powershell
-Get-AppxPackage | ? Name -match "trading|easyroam" | select Name,Publisher,InstallLocation
-```
-- **Purpose:** Confirm what was actually installed from those packages.
-- **Outcome:** TradingView.Desktop and de.dfn.easyroam, both with the expected publishers.
-
-```powershell
-Get-CimInstance Win32_Process -Filter "Name='servicehost.exe'" |
-  select ProcessId,ParentProcessId,ExecutablePath,CommandLine (elevated)
-```
-- **Purpose:** Resolve the SYSTEM process left over from section 4.1.
-- **Outcome:** C:\Program Files\McAfee\WebAdvisor\ServiceHost.exe, parent PID 1340 (services.exe). Legitimate.
-
-```powershell
-Get-CimInstance Win32_Service |
-  ? PathName -match 'servicehost' |
-  select Name,StartMode,PathName
-```
-- **Purpose:** Check whether a service was registered under that name.
-- **Outcome:** No suspicious service entry returned.
+<img width="720" height="658" alt="image" src="https://github.com/user-attachments/assets/9bbb9000-45f7-4d7b-8a18-b48f979d2341" />
 
 
 ### 4.8 Initial access analysis
 
-| **Source checked**                         | **Result**                                                                                                                                                                      |
-|--------------------------------------------|---------------------------------------------------------------------------------------------------------------------------------------------------------------------------------|
-| RunMRU (commands typed into Win+R)         | Only five benign entries: cmd, MDSCHED.EXE, mrt, msconfig, eventvwr. No malicious command, though the short list may mean older entries were cleared.                           |
-| PowerShell history (PSReadLine)            | No delivery command. One unrelated entry was noted: a third-party script run from the internet with administrator rights (date unknown). |
-| Windows Installer events (Application log) | No MsiInstaller events for 2 September 2025. The log has most likely rolled over in the year since.                                                                             |
-| Browser history                            | Not available locally: Chrome keeps history for 90 days.                                                                                                                        |
+<img width="632" height="267" alt="image" src="https://github.com/user-attachments/assets/fe71e59b-065b-4d53-967c-d4e1f31f85dc" />
 
 Commands pasted into the Win+R box run PowerShell non-interactively and
 do not appear in PowerShell history. Combined with the absence of any
@@ -425,26 +259,7 @@ dropped file before 16:16, this makes a fake verification prompt
 
 #### Commands used at this stage
 
-```powershell
-Get-ItemProperty "HKCU:\Software\Microsoft\Windows\CurrentVersion\Explorer\RunMRU"
-```
-- **Purpose:** Look for a command pasted into the Win+R box (ClickFix pattern).
-- **Outcome:** Only cmd, MDSCHED.EXE, mrt, msconfig and eventvwr. Nothing malicious.
-
-```powershell
-Get-Content (Get-PSReadLineOption).HistorySavePath |
-  Select-String "msi|http|iwr|curl|mshta|Svservices"
-```
-- **Purpose:** Look for a download command typed into PowerShell.
-- **Outcome:** No delivery command. One unrelated third-party script entry.
-
-```powershell
-Get-WinEvent -FilterHashtable @{LogName='Application'; ProviderName='MsiInstaller'; StartTime='2025-09-02 16:00'; EndTime='2025-09-02 16:30'} |
-  Format-List TimeCreated,Message
-```
-- **Purpose:** Find the Windows Installer record of the fe0.msi installation.
-- **Outcome:** "No events were found": the log has rolled over since 2025.
-
+<img width="702" height="417" alt="image" src="https://github.com/user-attachments/assets/63f44ccd-d180-4e55-a252-c0e585a49378" />
 
 ### 4.9 Threat intelligence (VirusTotal)
 
@@ -475,33 +290,27 @@ Get-WinEvent -FilterHashtable @{LogName='Application'; ProviderName='MsiInstalle
   Encrypt endpoints. The sonosarc gateways do not appear, so they are
   new intelligence.
 
-<p align="center"><img src="screenshots/14-msiinstaller-and-hashes.png" alt="No MsiInstaller events for 2 September 2025, and SHA-256 hashes of fe0.msi and service.exe" width="800"></p>
-
+<img width="938" height="344" alt="image" src="https://github.com/user-attachments/assets/260bafbb-7ca5-472b-b3fd-2ec1e8ad6fce" />
 *Figure 14: No MsiInstaller events for 2 September 2025, and SHA-256
 hashes of fe0.msi and service.exe*
 
-<p align="center"><img src="screenshots/15-virustotal-detection.png" alt="VirusTotal detection page for fe0.msi (11/62, hacktool.netsup)" width="800"></p>
-
+<img width="938" height="495" alt="image" src="https://github.com/user-attachments/assets/c8541132-2797-42ac-af74-ee48f8b46bd7" />
 *Figure 15: VirusTotal detection page for fe0.msi (11/62,
 hacktool.netsup)*
 
-<p align="center"><img src="screenshots/16-virustotal-details.png" alt="VirusTotal Details tab for fe0.msi showing file hashes and type" width="800"></p>
-
+<img width="938" height="520" alt="image" src="https://github.com/user-attachments/assets/63433a7d-74fc-4427-a4f3-ad79117e2187" />
 *Figure 16: VirusTotal Details tab for fe0.msi showing file hashes and
 type*
 
-<p align="center"><img src="screenshots/17-virustotal-execution-parents.png" alt="VirusTotal Relations: contacted IP addresses and execution parents (crap.zip and the PowerShell loader)" width="800"></p>
-
+<img width="938" height="495" alt="image" src="https://github.com/user-attachments/assets/43fcc401-f714-4574-b4d9-b0e59950c547" />
 *Figure 17: VirusTotal Relations: contacted IP addresses and execution
 parents (crap.zip and the PowerShell loader)*
 
-<p align="center"><img src="screenshots/18-virustotal-bundled-dropped.png" alt="VirusTotal Relations: bundled and dropped files, including Binary.aicustact.dll" width="800"></p>
-
+<img width="938" height="495" alt="image" src="https://github.com/user-attachments/assets/553cf5e4-21fa-466c-bf1b-25a97530fb50" />
 *Figure 18: VirusTotal Relations: bundled and dropped files, including
 Binary.aicustact.dll*
 
-<p align="center"><img src="screenshots/19-virustotal-contacted-domains.png" alt="VirusTotal Relations: contacted domains (benign Microsoft, Akamai and Let&#39;s Encrypt traffic)" width="800"></p>
-
+<img width="938" height="495" alt="image" src="https://github.com/user-attachments/assets/e0753e6a-4ddf-414e-b544-922b874a77be" />
 *Figure 19: VirusTotal Relations: contacted domains (benign Microsoft,
 Akamai and Let's Encrypt traffic)*
 
@@ -519,8 +328,7 @@ what happened on the affected host:
 
 4.  Restores the previous working directory.
 
-<p align="center"><img src="screenshots/20-virustotal-loader-code-insights.jpg" alt="VirusTotal Code Insights for the PowerShell loader, naming devenable[.]dev/fe0.msi" width="800"></p>
-
+<img width="938" height="534" alt="image" src="https://github.com/user-attachments/assets/82da57f1-68f9-487f-b8db-e7c03600d238" />
 *Figure 20: VirusTotal Code Insights for the PowerShell loader, naming
 devenable[.]dev/fe0.msi*
 
@@ -531,28 +339,7 @@ VirusTotal](https://www.virustotal.com/gui/file/ea4de238a6ce0943c9eebf367ceb76d7
 
 #### Commands used at this stage
 
-```powershell
-Get-FileHash "$env:APPDATA\Svservices\fe0.msi","$env:APPDATA\Svservices\service.exe" |
-  Format-List Hash,Path
-```
-- **Purpose:** Generate SHA-256 hashes for threat intelligence lookups.
-- **Outcome:** fe0.msi: 528373aa...3ceab1c; service.exe: ee60df2b...7ebb14f3.
-
-```powershell
-(Get-FileHash "$env:APPDATA\Svservices\fe0.msi").Hash | Set-Clipboard
-```
-- **Purpose:** Copy the hash without retyping 64 characters.
-- **Outcome:** Hash pasted into VirusTotal search.
-
-**Action:** virustotal.com \> Search \> paste hash \> Detection, Details, Relations tabs
-
-- **Purpose:** Check reputation, build history, related files and network behaviour.
-- **Outcome:** 11/62 detections (hacktool.netsup); build date 8 August 2025; PowerShell execution parent identified.
-
-**Action:** VirusTotal \> Relations \> Execution Parents \> malicous.msi
-
-- **Purpose:** Find out what launched the installer.
-- **Outcome:** PowerShell loader that downloads devenable[.]dev/fe0.msi into Svservices and runs msiexec silently.
+<img width="882" height="615" alt="image" src="https://github.com/user-attachments/assets/1d41f7b0-797a-476e-aa05-2c1348193f53" />
 
 
 ## 5. Attack chain
